@@ -5,10 +5,8 @@ OpenLIT OpenCog Instrumentor
 import os
 import logging
 from typing import Collection, Dict, Any, Optional
-import importlib.metadata
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.trace import SpanKind, Status, StatusCode
-from wrapt import wrap_function_wrapper
 
 from openlit.semcov import SemanticConvention
 
@@ -183,14 +181,14 @@ class OpenCogOrchestrator:
             cost_query = f"(optimize-cost ({operation} {model}))"
             cost_result = self._runner.run(cost_query)
             
-            # Extract results
+            # Extract results with robust checking
             selected_agent = "openai-agent"  # Default fallback
             cost_optimized = False
             
-            if agent_result and len(agent_result) > 0:
+            if agent_result and hasattr(agent_result, '__len__') and hasattr(agent_result, '__getitem__') and len(agent_result) > 0:
                 selected_agent = str(agent_result[0]).replace("(", "").replace(")", "")
             
-            if cost_result and len(cost_result) > 0:
+            if cost_result and hasattr(cost_result, '__len__') and hasattr(cost_result, '__getitem__') and len(cost_result) > 0:
                 cost_decision = str(cost_result[0])
                 cost_optimized = "use-local-model" in cost_decision
             
@@ -357,6 +355,9 @@ class OpenCogInstrumentor(BaseInstrumentor):
         # Store orchestrator for global access
         setattr(self, '_orchestrator', orchestrator)
         
+        # Make orchestrator globally accessible
+        set_global_orchestrator(orchestrator)
+        
         logger.info("OpenCog autonomous orchestrator instrumented successfully")
     
     def _uninstrument(self, **kwargs):
@@ -377,10 +378,13 @@ def get_global_orchestrator() -> Optional[OpenCogOrchestrator]:
     """Get the global OpenCog orchestrator instance."""
     return _global_orchestrator
 
-def set_global_orchestrator(orchestrator: OpenCogOrchestrator):
+def set_global_orchestrator(orchestrator: Optional[OpenCogOrchestrator]):
     """Set the global OpenCog orchestrator instance."""
-    global _global_orchestrator
-    _global_orchestrator = orchestrator
+    if orchestrator is not None:
+        global _global_orchestrator
+        _global_orchestrator = orchestrator
+    else:
+        logger.warning("Attempted to set None as global orchestrator - ignoring")
 
 def orchestrate_llm_call(operation: str, model: str, **kwargs) -> Dict[str, Any]:
     """

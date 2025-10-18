@@ -121,16 +121,22 @@ def extract_decision_from_metta_result(result: Any) -> Dict[str, Any]:
     if not result:
         return {"agent": "default", "confidence": 0.0}
     
-    # Simple parsing - in practice this would be more sophisticated
-    result_str = str(result[0]) if len(result) > 0 else "default"
+    # Robust parsing with type checking
+    result_str = "default"
+    if isinstance(result, str):
+        result_str = result
+    elif hasattr(result, '__len__') and hasattr(result, '__getitem__') and len(result) > 0:
+        result_str = str(result[0])
+    else:
+        result_str = str(result)
     
     # Extract agent name
     agent = "default-agent"
-    if "openai" in result_str:
+    if "openai" in result_str.lower():
         agent = "openai-agent"
-    elif "anthropic" in result_str:
+    elif "anthropic" in result_str.lower():
         agent = "anthropic-agent"
-    elif "embedding" in result_str:
+    elif "embedding" in result_str.lower():
         agent = "openai-embedding-agent"
     
     return {
